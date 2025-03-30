@@ -1,0 +1,108 @@
+
+
+
+if ! command -v python3 &> /dev/null
+then
+    echo "错误: Python3 未安装。请安装 Python3 后重试。"
+    exit 1
+fi
+
+
+if ! python3 -c "import tqdm" &> /dev/null
+then
+    echo "错误: 'tqdm' 模块未安装。请运行 'pip install tqdm' 后重试。"
+    exit 1
+fi
+
+
+read -p "请输入要搜索的 .dat 文件所在的目录路径: " directory_to_search
+
+
+if [ -z "$directory_to_search" ]; then
+    echo "错误: 未输入目录路径。"
+    exit 1
+fi
+
+
+if [ ! -d "$directory_to_search" ]; then
+    echo "错误: 目录 '$directory_to_search' 不存在。"
+    exit 1
+fi
+
+
+python3 << END_PYTHON
+
+import os
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
+
+def decimal_to_little_endian_hex(decimal_number, byte_length=4):
+
+    little_endian_bytes = decimal_number.to_bytes(byte_length, byteorder='little', signed=True)
+    hex_string = little_endian_bytes.hex()
+    return hex_string
+
+def search_hex_in_file(file_path, byte_pattern):
+
+    try:
+        with open(file_path, 'rb') as f:
+            content = f.read()
+            if byte_pattern in content:
+                return file_path
+    except Exception as e:
+        print(f"无法读取文件 {file_path}: {e}")
+    return None
+
+def search_dat_files(directory, hex_string, max_workers=8):
+
+    byte_pattern = bytes.fromhex(hex_string)
+    matches = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        
+        futures = []
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.lower().endswith('.dat'):
+                    file_path = os.path.join(root, file)
+                    futures.append(executor.submit(search_hex_in_file, file_path, byte_pattern))
+        
+        for future in tqdm(as_completed(futures), total=len(futures), desc="搜索进度"):
+            result = future.result()
+            if result:
+                matches.append(result)
+    return matches
+
+def main():
+    
+    decimal_numbers = [333600100]
+
+    
+    hex_list = []
+    for num in decimal_numbers:
+        hex_str = decimal_to_little_endian_hex(num)
+        hex_list.append(hex_str)
+
+    
+    
+    
+    directory_to_search = '$directory_to_search'
+
+    if not os.path.isdir(directory_to_search):
+        print("无效的目录路径。")
+        sys.exit(1)
+
+    
+    all_matches = set()
+    for hex_str in hex_list:
+        matches = search_dat_files(directory_to_search, hex_str)
+        print(f"找到包含载具美化的文件:")
+        for match in matches:
+            print(f" - {match}")
+
+if __name__ == "__main__":
+    main()
+
+END_PYTHON
+
+echo "搜索完毕。"
