@@ -1,0 +1,214 @@
+
+
+
+PYTHON_SCRIPT=$(cat << 'END'
+import re
+
+def modify_accessories_file(input_file, output_file, search_name):
+
+    try:
+        with open(input_file, 'r', encoding='utf-8') as infile:
+            
+            replacement_dict = {
+                "枪口": "28100400",
+                "弹匣": "29100400",
+                "机瞄": "20300800",
+                "枪托": "20500500",
+                "红点瞄准": "20300100",
+                "全息瞄准": "20300200",
+                "2倍瞄准": "20300300",
+                "3倍瞄准": "20301400",
+                "4倍瞄准": "20300400",
+                "6倍瞄准": "20301500",
+                "侧面瞄准": "20301800",
+                "快速弹匣": "20401200",
+                "快速扩容": "20401300",
+                "扩容弹匣": "20401100",
+                "半截式握": "20200500",
+                "激光瞄准": "20200700",
+                "轻型握把": "20200400",
+                "直角握把": "20200100",
+                "垂直握把": "20200200",
+                "拇指握把": "20200600",
+                "枪口补偿": "20100900",
+                "消焰器": "20101000",
+                "消音器": "20101100",
+                "战术枪托": "20500200"
+            }
+            replacement_length = len(replacement_dict)
+            
+            
+            is_grouping = False
+            group_lines = []  
+            group_number = 0  
+
+            
+            all_groups = []
+
+            for line in infile:
+                
+                if re.search(re.escape(search_name), line):
+                    if not is_grouping:
+                        
+                        is_grouping = True
+                        group_lines = []
+                        group_number += 1
+                        
+                        is_valid_group = True
+                    
+                    group_lines.append(line)
+                    
+                    if len(group_lines) == 24:
+                        if is_valid_group:
+                            all_groups.append((group_number, group_lines))
+                            is_grouping = False
+                            group_lines = []
+                else:
+                    if is_grouping:
+                        
+                        is_valid_group = False
+                    
+                    continue
+
+            
+            if is_grouping and len(group_lines) > 0:
+                
+                if is_valid_group:
+                    all_groups.append((group_number, group_lines))
+
+        if not all_groups:
+            print("没有找到匹配的行。")
+            return
+
+        
+        print(f"找到以下分组（每组24行）：")
+        for idx, (group_num, lines) in enumerate(all_groups, start=1):
+            print(f"{idx}. 分组 {group_num}")
+
+        
+        while True:
+            try:
+                choice = int(input("请输入要处理的分组编号（输入0退出）："))
+                if choice == 0:
+                    print("退出程序。")
+                    return
+                if 1 <= choice <= len(all_groups):
+                    break
+                else:
+                    print("无效的选择，请重新输入。")
+            except ValueError:
+                print("请输入一个有效的数字。")
+
+        selected_group = all_groups[choice - 1][1]
+
+        
+        with open(output_file, 'w', encoding='utf-8') as outfile:
+            for line in selected_group:
+                
+                
+                pattern = rf'{re.escape(search_name)}\(([^\)]+)\)'  
+                match = re.search(pattern, line)
+                if match:
+                    second_field = match.group(1)
+                    print(f"Extracted second field: {second_field}")  
+                    
+                    if second_field in replacement_dict:
+                        replacement_number = replacement_dict[second_field]
+                        
+                        original_number_match = re.search(r'\*\*\s+(\d+)\s+\*\*', line)
+                        if original_number_match:
+                            original_number = original_number_match.group(1)
+                            
+                            
+                            
+                            new_line = re.sub(rf'{re.escape(search_name)}\([^\)]+\)', replacement_number, line)
+                            
+                            outfile.write(f"{replacement_number} {original_number}\n")
+                            print(f"Replacement number: {replacement_number}")  
+                        else:
+                            print(f"警告：行中未找到被替换的数字，跳过。\n{line}")
+                    else:
+                        
+                        print(f"警告：未找到替换规则，跳过。\n{line}")
+                else:
+                    print(f"警告：行格式不正确，跳过。\n{line}")
+        
+        print(f"处理完成，结果已保存到 {output_file}")
+
+    except FileNotFoundError:
+        print(f"错误：文件 {input_file} 未找到。")
+    except Exception as e:
+        print(f"发生错误：{e}")
+
+def add_comments_to_3txt(z_file, three_file, result_file):
+    
+    comment_dict = {}
+    with open(z_file, 'r', encoding='utf-8') as zf:
+        for line in zf:
+            line = line.strip()
+            if line:
+                
+                match = re.match(r'\d+\s*--\s*(\d+)\s*--\s*(.*?)\s*--\s*(.*)', line)
+                if match:
+                    number, comment1, comment2 = match.groups()
+                    comment_dict[number] = comment1  
+
+    
+    with open(three_file, 'r', encoding='utf-8') as tf:
+        lines = [line.strip() for line in tf if line.strip()]
+
+    
+    updated_lines = []
+    for line in lines:
+        
+        match = re.match(r'(\d+)\s+(\d+)', line)
+        if match:
+            first_number, second_number = match.groups()
+            
+            first_comment = comment_dict.get(first_number, '')
+            
+            second_comment = comment_dict.get(second_number, '')
+            if first_comment and second_comment:
+                
+                updated_line = f"       - [{first_number}, {second_number}]#{first_comment}, {second_comment}\n"
+                updated_lines.append(updated_line)
+            else:
+                
+                updated_lines.append(f"{line}\n")
+        else:
+            
+            updated_lines.append(f"{line}\n")
+
+    
+    with open(result_file, 'w', encoding='utf-8') as rf:
+        rf.writelines(updated_lines)
+    
+    print(f"结果已保存到 {result_file}")
+
+if __name__ == "__main__":
+    z_filepath = 'naixu/txt/代码表.txt'
+    three_filepath = '提取结果.txt'
+    result_filepath = '提取结果.txt'
+
+    input_filename = 'naixu/txt/配件.txt'
+    result_filename = '提取结果.txt'
+
+    
+    search_name = input("请输入要搜索的名字 ：")
+    
+    modify_accessories_file(input_filename, result_filename, search_name)
+    
+    add_comments_to_3txt(z_filepath, three_filepath, result_filepath)
+    
+END
+)
+
+
+TEMP_PYTHON_SCRIPT=$(mktemp)
+echo "$PYTHON_SCRIPT" > "$TEMP_PYTHON_SCRIPT"
+
+
+python "$TEMP_PYTHON_SCRIPT"
+
+
+rm "$TEMP_PYTHON_SCRIPT"

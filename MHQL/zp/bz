@@ -1,0 +1,159 @@
+
+
+
+PYTHON_CODE=$(cat <<'END'
+import os
+import re
+
+def load_data(file_path):
+
+    if not os.path.exists(file_path):
+        print(f"文件 {file_path} 不存在。")
+        return []
+    with open(file_path, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+    return [line.strip() for line in lines]
+
+def display_options(options, title):
+
+    print(f"\n{title}:")
+    for idx, option in enumerate(options, 1):
+        print(f"{idx}. {option}")
+    while True:
+        try:
+            choice = int(input(f"请选择 {title} 的编号（1-{len(options)}）："))
+            if 1 <= choice <= len(options):
+                return choice - 1
+            else:
+                print(f"请输入1到{len(options)}之间的数字。")
+        except ValueError:
+            print("请输入有效的数字。")
+
+def extract_middle_value(line):
+
+    parts = line.split('--')
+    if len(parts) >= 3:
+        return parts[1].strip()
+    else:
+        return None
+
+def search_and_select(data, search_term, search_type):
+
+    matched_lines = [line for line in data if search_term in line]
+    if not matched_lines:
+        print(f"未找到包含 '{search_term}' 的{search_type}。")
+        return None
+    choice = display_options(matched_lines, f"匹配到的{search_type}")
+    selected_line = matched_lines[choice]
+    middle_value = extract_middle_value(selected_line)
+    if middle_value:
+        return middle_value
+    else:
+        print("无法提取中间值。")
+        return None
+
+def clear_result_file(result_file):
+
+    if os.path.exists(result_file):
+        print(f"\n注:工具会清空'{result_file}' ")
+        while True:
+            backup = input("是否要备份该文件？（y/n）：").strip().lower()
+            if backup == 'y':
+                backup_file = result_file + '.备份'
+                os.rename(result_file, backup_file)
+                print(f"文件已备份为 '{backup_file}'。")
+                break
+            elif backup == 'n':
+                break
+            else:
+                print("请输入 'y' 或 'n'。")
+    with open(result_file, 'w', encoding='utf-8') as file:
+        pass
+
+def main():
+    file_path = 'naixu/txt/代码表.txt'
+    result_file = '提取结果.txt'
+    data = load_data(file_path)
+    if not data:
+        return
+
+    clear_result_file(result_file)
+
+    while True:
+        original_skin_name = input("\n请输入原皮名字（输入 '退出' 或 'exit' 退出工具）：").strip()
+        if original_skin_name.lower() in ['退出', 'exit']:
+            print("程序已退出。")
+            break
+        if not original_skin_name:
+            print("原皮名字不能为空。")
+            continue
+        first_middle_value = search_and_select(data, original_skin_name, '原皮名字')
+        if not first_middle_value:
+            continue
+
+        beautified_name = input("请输入美化名字（输入 '退出' 或 'exit' 退出工具）：").strip()
+        if beautified_name.lower() in ['退出', 'exit']:
+            print("程序已退出。")
+            break
+        if not beautified_name:
+            print("美化名字不能为空。")
+            continue
+        second_middle_value = search_and_select(data, beautified_name, '美化名字')
+        if not second_middle_value:
+            continue
+
+        with open(result_file, 'a', encoding='utf-8') as file:
+            file.write(f"{first_middle_value} {second_middle_value}\n")
+        print(f"结果已保存到 {result_file}")
+
+def display_menu():
+    print("=== 半自动配置工具 ===")
+    print("输入 '退出' 或 'exit' 退出工具。")
+    print("======================")
+
+def add_comments_to_3txt(z_file, three_file, result_file):
+    comment_dict = {}
+    with open(z_file, 'r', encoding='utf-8') as zf:
+        for line in zf:
+            line = line.strip()
+            if line:
+                match = re.match(r'\d+\s*--\s*(\d+)\s*--\s*(.*?)\s*--\s*(.*)', line)
+                if match:
+                    number, comment1, comment2 = match.groups()
+                    comment_dict[number] = comment1
+
+    with open(three_file, 'r', encoding='utf-8') as tf:
+        lines = [line.strip() for line in tf if line.strip()]
+
+    updated_lines = []
+    for line in lines:
+        match = re.match(r'(\d+)\s+(\d+)', line)
+        if match:
+            first_number, second_number = match.groups()
+            first_comment = comment_dict.get(first_number, '')
+            second_comment = comment_dict.get(second_number, '')
+            if first_comment and second_comment:
+                updated_line = f"       - [{first_number}, {second_number}]#{first_comment}, {second_comment}\n"
+                updated_lines.append(updated_line)
+            else:
+                updated_lines.append(f"{line}\n")
+        else:
+            updated_lines.append(f"{line}\n")
+
+    with open(result_file, 'w', encoding='utf-8') as rf:
+        rf.writelines(updated_lines)
+
+    print(f"结果已保存到 {result_file}")
+
+if __name__ == "__main__":
+    display_menu()
+    main()
+    z_filepath = 'naixu/txt/代码表.txt'
+    three_filepath = '提取结果.txt'
+    add_comments_to_3txt(z_filepath, three_filepath, three_filepath)
+END
+)
+
+
+python3 -c "$PYTHON_CODE"
+
