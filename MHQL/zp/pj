@@ -186,11 +186,11 @@ def add_comments_to_3txt(z_file, three_file, result_file):
     print(f"结果已保存到 {result_file}")
 
 if __name__ == "__main__":
-    z_filepath = 'naixu/txt/代码表.txt'
+    z_filepath = 'MHQL/txt/代码表.txt'
     three_filepath = '提取结果.txt'
     result_filepath = '提取结果.txt'
 
-    input_filename = 'naixu/txt/配件.txt'
+    input_filename = 'MHQL/txt/配件.txt'
     result_filename = '提取结果.txt'
 
     

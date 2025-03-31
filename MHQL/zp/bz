@@ -71,7 +71,7 @@ def clear_result_file(result_file):
         pass
 
 def main():
-    file_path = 'naixu/txt/代码表.txt'
+    file_path = 'MHQL/txt/代码表.txt'
     result_file = '提取结果.txt'
     data = load_data(file_path)
     if not data:
@@ -148,7 +148,7 @@ def add_comments_to_3txt(z_file, three_file, result_file):
 if __name__ == "__main__":
     display_menu()
     main()
-    z_filepath = 'naixu/txt/代码表.txt'
+    z_filepath = 'MHQL/txt/代码表.txt'
     three_filepath = '提取结果.txt'
     add_comments_to_3txt(z_filepath, three_filepath, three_filepath)
 END
