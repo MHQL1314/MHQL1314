@@ -1,0 +1,225 @@
+
+PYTHON_SCRIPT=$(cat << 'END'
+
+import yaml
+import sys
+import os
+import random
+import ast
+from tqdm import tqdm
+
+def decimal_to_little_endian_hex(decimal_number, byte_length=4):
+    little_endian_bytes = decimal_number.to_bytes(byte_length, byteorder='little', signed=True)
+    hex_string = little_endian_bytes.hex()
+    return hex_string
+
+def search_hex_positions(file_path, target_hex):
+    byte_pattern = bytes.fromhex(target_hex)
+    positions = []
+    with open(file_path, 'rb') as f:
+        data = f.read()
+        offset = 0
+        while True:
+            pos = data.find(byte_pattern, offset)
+            if pos == -1:
+                break
+            positions.append(pos)
+            offset = pos + 1
+    return positions
+
+def replace_values(file_path, positions, new_value):
+    with open(file_path, 'rb') as f:
+        data = bytearray(f.read())
+
+    
+    byte_length = 4  
+    new_bytes = new_value.to_bytes(byte_length, byteorder='little', signed=True)
+    for pos in positions:
+        if pos + byte_length > len(data):
+            raise ValueError(f"替换位置超出文件长度: {pos}")
+        data[pos:pos + byte_length] = new_bytes
+
+    
+    with open(file_path, 'wb') as f:
+        f.write(data)
+
+def find_dat_file_with_target(output_folder, target_hex):
+    target_byte = bytes.fromhex(target_hex)
+    for file_name in os.listdir(output_folder):
+        if file_name.endswith(''):
+            file_path = os.path.join(output_folder, file_name)
+            with open(file_path, 'rb') as f:
+                data = f.read()
+                if target_byte in data:
+                    return file_path
+    return None
+
+def process_targets(config):
+    search_values = config.get('search_values', [])
+    output_folder = config.get('output_folder')
+
+    if not output_folder:
+        print("错误: 未在配置文件中找到 'output_folder'。")
+        sys.exit(1)
+
+    if not search_values:
+        print("错误: 未在配置文件中找到 'search_values'。")
+        sys.exit(1)
+
+    total_pairs = len(search_values)
+    modified_pairs = []
+    unmodified_pairs = []
+
+    for target_list in tqdm(search_values, desc="处理互换对"):
+        if len(target_list) != 2:
+            print(f"错误: 必须包含两个十进制数。当前对: {target_list}")
+            unmodified_pairs.append(target_list)
+            continue
+
+        num1, num2 = target_list
+        byte_length = 4  
+        target_hex1 = decimal_to_little_endian_hex(num1, byte_length)
+        target_hex2 = decimal_to_little_endian_hex(num2, byte_length)
+        
+
+        
+        dat_file_path1 = find_dat_file_with_target(output_folder, target_hex1)
+        dat_file_path2 = find_dat_file_with_target(output_folder, target_hex2)
+
+        if not dat_file_path1:
+            print(f"未找到包含美化值 '{target_hex1}' 的 .dat 文件。")
+            unmodified_pairs.append(target_list)
+            continue
+        if not dat_file_path2:
+            print(f"未找到包含美化值 '{target_hex2}' 的 .dat 文件。")
+            unmodified_pairs.append(target_list)
+            continue
+
+        
+        positions1 = search_hex_positions(dat_file_path1, target_hex1)
+        positions2 = search_hex_positions(dat_file_path2, target_hex2)
+
+        if not positions1 and not positions2:
+            print(f"在文件 '{dat_file_path1}' 和 '{dat_file_path2}' 中未找到 '{target_hex1}' 或 '{target_hex2}'。")
+            unmodified_pairs.append(target_list)
+            continue
+
+        replace_values(dat_file_path1, positions1, num2)
+        replace_values(dat_file_path2, positions2, num1)
+
+        
+        modified_pairs.append(target_list)
+
+    
+    if unmodified_pairs:
+        print("\n以下互换对未成功修改:")
+        for pair in unmodified_pairs:
+            print(pair)
+
+    print(f"\n互换完成。共处理 {total_pairs} 对，其中 {len(modified_pairs)} 对已修改，{len(unmodified_pairs)} 对未修改。")
+
+def load_yaml_config(config_file):
+    with open(config_file, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+def load_py_config(config_file):
+    with open(config_file, 'r', encoding='utf-8') as f:
+        py_code = f.read()
+        
+        local_vars = {}
+        exec(py_code, {}, local_vars)
+        
+        
+        config = {
+            'source_folder': local_vars.get('source_folder'),
+            'output_folder': local_vars.get('output_folder'),
+            'target_markers': local_vars.get('target_markers'),
+            'search_values': local_vars.get('search_values', [])
+        }
+        
+        
+        if not config['output_folder']:
+            raise ValueError("Python 配置文件中未找到 'output_folder'。")
+        if not config['search_values']:
+            raise ValueError("Python 配置文件中的 'search_values' 未定义。")
+        
+        return config
+
+def load_config(config_file):
+    if config_file.endswith('.yaml'):
+        return load_yaml_config(config_file)
+    elif config_file.endswith('.py'):
+        return load_py_config(config_file)
+    else:
+        raise ValueError("不支持的配置文件类型。仅支持 .yaml 和 .py 配置文件。")
+
+def main():
+    
+    config_files = ['伪实体配置.yaml', '伪实体配置.py']
+
+    
+    yaml_exists = os.path.isfile(config_files[0])
+    py_exists = os.path.isfile(config_files[1])
+
+    if not yaml_exists and not py_exists:
+        print("错误: 未找到配置文件。")
+        sys.exit(1)
+
+    if yaml_exists and py_exists:
+        print("检测到多个配置文件:")
+        print("1. 伪实体配置.yaml")
+        print("2. 伪实体配置.py")
+        choice = input("请选择要使用的配置文件 (请输入1或2)，输入'exit'退出 :")
+        if choice.lower() == 'exit':
+            print("已退出。")
+            sys.exit(0)
+        elif choice == '1':
+            config_file = config_files[0]
+        elif choice == '2':
+            config_file = config_files[1]
+        else:
+            print("无效的选择。退出程序。")
+            sys.exit(1)
+    elif yaml_exists:
+        config_file = config_files[0]
+    else:
+        config_file = config_files[1]
+
+    
+    try:
+        config = load_config(config_file)
+    except ValueError as e:
+        print(f"配置文件加载错误: {e}")
+        sys.exit(1)
+
+    
+    output_folder = config.get('output_folder')
+    if not output_folder:
+        print("错误: 未在配置文件中找到 'output_folder'。")
+        sys.exit(1)
+
+    if not os.path.isdir(output_folder):
+        print(f"错误: 文件夹 '{output_folder}' 不存在。")
+        sys.exit(1)
+
+    
+    process_targets(config)
+
+    print("\n成功修改美化。")
+
+if __name__ == "__main__":
+    main()
+   
+
+END
+)
+
+
+TEMP_PYTHON_SCRIPT=$(mktemp)
+echo "$PYTHON_SCRIPT" > "$TEMP_PYTHON_SCRIPT"
+
+
+python "$TEMP_PYTHON_SCRIPT"
+
+
+rm "$TEMP_PYTHON_SCRIPT"
