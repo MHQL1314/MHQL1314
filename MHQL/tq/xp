@@ -135,7 +135,7 @@ def compare_files(original_file_path, modified_file_path, output_path):
     convert_hex_pairs_to_decimal(unique_output_path, '提取结果.txt')
 
     
-    add_comments_to_提取结果txt('naixu/txt/代码表.txt', '提取结果.txt', '提取结果.txt')
+    add_comments_to_提取结果txt('MHQL/txt/代码表.txt', '提取结果.txt', '提取结果.txt')
 
 def convert_hex_pairs_to_decimal(input_file, output_file):
     try:
