@@ -7,21 +7,96 @@ NC='\033[0m' # 无颜色
 DEFAULT_PAK_DIR="pak"
 clear
 show_menu() {
+
+
+#微验Shell模板
+
+echo "\n欢迎使用微验网络验证\n微验官网：llua.cn\n加载中...\n"
+
+if ! [ -e "./MHQL/rc4" ]; then
+    echo "rc4文件缺失"
+    exit 1
+fi
+chmod 777 MHQL/rc4
+
+#配置区
+wyUrl="http://wy.llua.cn/api/" #API接口(一般不用改)
+wyAppid="44668" #APPID(应用ID)
+wyAppkey="3jyg49QTrYy8rMJi" #APPKEY(应用秘钥)
+wyRc4key="Gk8hcc2HieHw6sh" #Rc4KEY(Rc4秘钥)
+deCode="82969117" #code(登录自定义状态码)
+
+
+#函数区
+parse_json() {
+  json=$1
+  query=$2
+  value=$(echo "$json" | grep -o "\"$query\":[^ }]*" | sed 's/"[^"]*":\([^,}]*\).*/\1/' | head -n 1)
+  value="${value#\"}"
+  value="${value%\"}"
+  echo "$value"
+}
+
+#公告区
+notice=`curl -s "${wyUrl}?id=notice&app=${wyAppid}"`
+deNotice=`./MHQL/rc4 $notice $wyRc4key "de"`
+Notices=`parse_json "$deNotice" "app_gg"`
+echo "系统公告:\n${Notices}\n"
+
+
+#验证区
+echo "请输入卡密：(点击屏幕右下角lm弹窗键盘)"
+read kami
+timer=`date +%s`
+android_id=`settings get secure android_id`
+fingerprint=`getprop ro.build.fingerprint`
+imei=`echo -n "${android_id}.${fingerprint}" | md5sum | awk '{print $1}'`
+value="$RANDOM${timer}"
+sign=`echo -n "kami=${kami}&markcode=${imei}&t=${timer}&${wyAppkey}" | md5sum | awk '{print $1}'`
+data=`./MHQL/rc4 "kami=${kami}&markcode=${imei}&t=${timer}&sign=${sign}&value=${value}&${wyAppkey}" $wyRc4key "en"`
+logon=`curl -s "${wyUrl}?id=kmlogon&app=${wyAppid}&data=${data}"`
+deLogon=`./MHQL/rc4 $logon $wyRc4key "de"`
+wy_Code=`parse_json "$deLogon" "code"`
+if  [ "$wy_Code" -eq "$deCode" ]; then
+    timec=`parse_json "$deLogon" "time"`
+    check=`echo -n  "${timec}${wyAppkey}${value}" | md5sum | awk '{print $1}'`
+    checks=`parse_json "$deLogon" "check"`
+    if  [ "$check" == "$checks" ]; then
+        vip=`parse_json "$deLogon" "vip"`
+        vips=`date -d @$vip +"%Y-%m-%d %H:%M:%S"`
+        clear
+        echo "登录成功，到期时间：${vips}"
+    else
+        echo "校验失败"
+        exit
+    fi
+else
+    parse_json "$deLogon" "msg"
+    exit
+fi
+
+
+
+
+echo "验证成功后程序开始执行..."
+
+
+
                                    figlet "   MH TOOL" | lolcat
-echo -e "${YELLOW} MH高效工具，助您一臂之力!${NC}" 
+echo -e "${YELLOW}       q群82969117${NC}" 
 echo " "                               
 echo -e "${YELLOW} ${quotes[$random_index]}${NC}"   
 echo "  "                           
 echo -e "${YELLOW}╔════════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║${YELLOW}                 ${PURPLE}MH工具${NC}                     ${YELLOW}║${NC}"
+echo -e "${YELLOW}║${YELLOW}                 ${PURPLE}MH工具${NC}                   ${YELLOW}║${NC}"
 echo -e "${YELLOW}╠════════════════════════════════════════════╣${NC}"
-echo -e "${YELLOW}║${YELLOW}${RED}BY:沐涵千凌${NC}                                         ${YELLOW}║${NC}"
-echo -e "${YELLOW}║${YELLOW}${RED}Q群:${NC}                                                ${YELLOW}║${NC}"  
-echo -e "${YELLOW}║${YELLOW}${RED}强大工具${NC}                                            ${YELLOW}║${NC}"  
-echo -e "${YELLOW}║${YELLOW}${RED}免费工具${NC}                                            ${YELLOW}║${NC}"                                      
+echo -e "${YELLOW}║${YELLOW}${RED}小白慎用工具${NC}                                ${YELLOW}║${NC}"  
+echo -e "${YELLOW}║${YELLOW}${RED}智力障碍人士禁用本工具${NC}                      ${YELLOW}║${NC}"                                      
 echo -e "${YELLOW}╠════════════════════════════════════════════╣${NC}"
 echo -e "${YELLOW}║${GREEN}    时间: ${BLUE}${hours}:${minutes}:${seconds}  ${YELLOW}║${NC}  ${GREEN}日期: ${BLUE}${date_str}${YELLOW}    ${YELLOW} ║${NC}"
 echo -e "${YELLOW}╠════════════════════════════════════════════╣${NC}"
+echo -e "${YELLOW}║${YELLOW}1) 自动美化                                 ${YELLOW}║${NC}"
+echo -e "${YELLOW}║${YELLOW}============================================${YELLOW}║${NC}"
 echo -e "${YELLOW}║${YELLOW}2) 解包                                     ${YELLOW}║${NC}"
 echo -e "${YELLOW}║${YELLOW}============================================${YELLOW}║${NC}"
 echo -e "${YELLOW}║${YELLOW}3) 打包                                     ${YELLOW}║${NC}"
@@ -54,8 +129,7 @@ echo " "
 echo -e "${YELLOW}╔════════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}║${YELLOW}                 ${PURPLE}MH工具${NC}                   ${YELLOW}║${NC}"
 echo -e "${YELLOW}╠════════════════════════════════════════════╣${NC}"
-echo -e "${YELLOW}║${YELLOW}${RED}BY:沐涵千凌${NC}                                     ${YELLOW}║${NC}"
-echo -e "${YELLOW}║${YELLOW}${RED}Q群:${NC}                          ${YELLOW}║${NC}"                              
+echo -e "${YELLOW}║${YELLOW}${RED}BY:MH${NC}                                     ${YELLOW}║${NC}"                         
 echo -e "${YELLOW}╠════════════════════════════════════════════╣${NC}"
 }
 a=$(cd_menu)
@@ -207,11 +281,11 @@ tutorial_menu() {
     echo -e "${BLUE}2) 如有其他问题不能解决请联系作者即可${NC}"
 }
 zdmh_menu() {
-    echo -e "${YELLOW}║${YELLOW}1) 无法使用                       ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${YELLOW}1) 自动美化(除伪实体)                       ${YELLOW}║${NC}"
     echo -e "${YELLOW}║${YELLOW}============================================${YELLOW}║${NC}"
-     echo -e "${YELLOW}║${YELLOW}2) 无法使用                   ${YELLOW}║${NC}"   
+     echo -e "${YELLOW}║${YELLOW}2) 非块自动美化(除伪实体)                   ${YELLOW}║${NC}"   
     echo -e "${YELLOW}║${YELLOW}============================================${YELLOW}║${NC}"
-    echo -e "${YELLOW}║${YELLOW}3) 无法使用                           ${YELLOW}║${NC}"
+    echo -e "${YELLOW}║${YELLOW}3) 自动伪实体美化                           ${YELLOW}║${NC}"
     echo -e "${YELLOW}║${YELLOW}============================================${YELLOW}║${NC}"
     echo -e "${YELLOW}║${YELLOW}4) 返回菜单                                 ${YELLOW}║${NC}"
     echo -e "${YELLOW}╚════════════════════════════════════════════╝${NC}"
@@ -314,7 +388,7 @@ while true; do
                read -r zdmh_choice
                echo ""
                case $zdmh_choice in
-                   0)
+                   1)
                       ./MHQL/mh/zm 
                       if [ $? -eq 0 ]; then
                           while true; do
